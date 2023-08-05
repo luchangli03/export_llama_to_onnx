@@ -5,7 +5,7 @@ from torch import nn
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 
-def export_lm_head(model, config, dtype, args):
+def export_lm_head(lm_head_model, config, dtype, args):
     batch = 1
     seq = 1
     hidden_size = config.hidden_size
@@ -17,7 +17,7 @@ def export_lm_head(model, config, dtype, args):
 
     # Export the model
     torch.onnx.export(
-        model.lm_head,
+        lm_head_model,
         input_data,
         onnx_file_name,
         opset_version=args.opset,
@@ -30,7 +30,7 @@ def export_lm_head(model, config, dtype, args):
     )
 
 
-def export_norm(model, config, dtype, args):
+def export_norm(norm_model, config, dtype, args):
     batch = 1
     seq = 1
     hidden_size = config.hidden_size
@@ -42,7 +42,7 @@ def export_norm(model, config, dtype, args):
 
     # Export the model
     torch.onnx.export(
-        model.model.norm,
+        norm_model,
         input_data,
         onnx_file_name,
         opset_version=args.opset,
@@ -55,7 +55,7 @@ def export_norm(model, config, dtype, args):
     )
 
 
-def export_embeding(model, config, args):
+def export_embeding(embed_model, config, args):
     batch = 1
     seq = 1
     input_shape = [batch, seq]
@@ -66,7 +66,7 @@ def export_embeding(model, config, args):
 
     # Export the model
     torch.onnx.export(
-        model.model.embed_tokens,
+        embed_model,
         input_data,
         onnx_file_name,
         opset_version=args.opset,
@@ -112,7 +112,7 @@ class DecoderLayersWrapper(nn.Module):
         return hidden_states, *kv_caches_out
 
 
-def export_decoders(model, config, dtype, args):
+def export_decoders(decoder_layers, config, dtype, args):
     """
     Note
     # please be care of the format of kv cache
@@ -128,15 +128,14 @@ def export_decoders(model, config, dtype, args):
     sumN = 32
     lastN = sumN - N
 
-    layers = model.model.layers
-    layer_num = len(layers)
+    layer_num = len(decoder_layers)
 
     head_num = config.num_attention_heads
     hidden_size1 = hidden_size // head_num
 
     print("layer_num:", layer_num, hidden_size1)
 
-    layers0_wrapper = DecoderLayersWrapper(layers, config)
+    decoder_layers_wrapper = DecoderLayersWrapper(decoder_layers, config)
 
     hidden_in = torch.randn([batch, N, hidden_size], dtype=dtype).to(args.device)
     attention_mask = torch.randn([batch, 1, N, sumN], dtype=dtype).to(args.device)
@@ -164,7 +163,7 @@ def export_decoders(model, config, dtype, args):
         dynamic_axes[f"past_value_in{i}"] = {2: "lastN"}
 
     torch.onnx.export(
-        layers0_wrapper,
+        decoder_layers_wrapper,
         (hidden_in, attention_mask, position_ids, kv_caches_in),
         onnx_file_name,
         opset_version=args.opset,
@@ -196,10 +195,10 @@ def export_llama(args):
     # )
     # print(tokenizer.decode(generation_output[0]))
 
-    # export_lm_head(model, config, dtype, args)
-    # export_norm(model, config, dtype, args)
-    # export_embeding(model, config, args)
-    export_decoders(model, config, dtype, args)
+    export_lm_head(model.lm_head, config, dtype, args)
+    export_norm(model.model.norm, config, dtype, args)
+    export_embeding(model.model.embed_tokens, config, args)
+    export_decoders(model.model.layers, config, dtype, args)
 
 
 if __name__ == "__main__":
