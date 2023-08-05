@@ -4,12 +4,11 @@ import torch
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 
-def export_lm_head(model, config, args):
+def export_lm_head(model, config, dtype, args):
     batch = 1
     seq = 1
     hidden_size = config.hidden_size
 
-    dtype = torch.float16
     input_shape = [batch, seq, hidden_size]
     input_data = torch.randn(input_shape, dtype=dtype).to(args.device)
 
@@ -18,6 +17,55 @@ def export_lm_head(model, config, args):
     # Export the model
     torch.onnx.export(
         model.lm_head,
+        input_data,
+        onnx_file_name,
+        opset_version=args.opset,
+        do_constant_folding=True,
+        input_names=['input'],
+        output_names=['output'],
+        dynamic_axes={
+            'input': {1: 'N'}
+        },
+    )
+
+
+def export_norm(model, config, dtype, args):
+    batch = 1
+    seq = 1
+    hidden_size = config.hidden_size
+
+    input_shape = [batch, seq, hidden_size]
+    input_data = torch.randn(input_shape, dtype=dtype).to(args.device)
+
+    onnx_file_name = os.path.join(args.out_dir, "norm.onnx")
+
+    # Export the model
+    torch.onnx.export(
+        model.model.norm,
+        input_data,
+        onnx_file_name,
+        opset_version=args.opset,
+        do_constant_folding=True,
+        input_names=['input'],
+        output_names=['output'],
+        dynamic_axes={
+            'input': {1: 'N'}
+        },
+    )
+
+
+def export_embeding(model, config, args):
+    batch = 1
+    seq = 1
+    input_shape = [batch, seq]
+    dtype = torch.int64
+    input_data = torch.ones(input_shape, dtype=dtype).to(args.device)
+
+    onnx_file_name = os.path.join(args.out_dir, "embeding.onnx")
+
+    # Export the model
+    torch.onnx.export(
+        model.model.embed_tokens,
         input_data,
         onnx_file_name,
         opset_version=args.opset,
@@ -51,7 +99,9 @@ def export_llama(args):
     # )
     # print(tokenizer.decode(generation_output[0]))
 
-    export_lm_head(model, config, args)
+    export_lm_head(model, config, dtype, args)
+    export_norm(model, config, dtype, args)
+    export_embeding(model, config, args)
 
 
 if __name__ == "__main__":
