@@ -2,10 +2,11 @@ import os
 import argparse
 import torch
 from torch import nn
-from transformers import AutoTokenizer, LlamaForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def export_lm_head(lm_head_model, config, dtype, args):
+def export_lm_head(lm_head_model, config, dtype, args, model_name):
+    # fake size used to generate fake data
     batch = 1
     seq = 1
     hidden_size = config.hidden_size
@@ -13,7 +14,7 @@ def export_lm_head(lm_head_model, config, dtype, args):
     input_shape = [batch, seq, hidden_size]
     input_data = torch.randn(input_shape, dtype=dtype).to(args.device)
 
-    onnx_file_name = os.path.join(args.out_dir, "lm_head1.onnx")
+    onnx_file_name = os.path.join(args.out_dir, f"{model_name}.onnx")
 
     # Export the model
     torch.onnx.export(
@@ -30,7 +31,7 @@ def export_lm_head(lm_head_model, config, dtype, args):
     )
 
 
-def export_norm(norm_model, config, dtype, args):
+def export_norm(norm_model, config, dtype, args, model_name):
     batch = 1
     seq = 1
     hidden_size = config.hidden_size
@@ -38,7 +39,7 @@ def export_norm(norm_model, config, dtype, args):
     input_shape = [batch, seq, hidden_size]
     input_data = torch.randn(input_shape, dtype=dtype).to(args.device)
 
-    onnx_file_name = os.path.join(args.out_dir, "norm.onnx")
+    onnx_file_name = os.path.join(args.out_dir, f"{model_name}.onnx")
 
     # Export the model
     torch.onnx.export(
@@ -55,14 +56,14 @@ def export_norm(norm_model, config, dtype, args):
     )
 
 
-def export_embeding(embed_model, config, args):
+def export_embeding(embed_model, config, args, model_name):
     batch = 1
     seq = 1
     input_shape = [batch, seq]
     dtype = torch.int64
     input_data = torch.ones(input_shape, dtype=dtype).to(args.device)
 
-    onnx_file_name = os.path.join(args.out_dir, "embeding.onnx")
+    onnx_file_name = os.path.join(args.out_dir, f"{model_name}.onnx")
 
     # Export the model
     torch.onnx.export(
@@ -112,14 +113,14 @@ class DecoderLayersWrapper(nn.Module):
         return hidden_states, *kv_caches_out
 
 
-def export_decoders(decoder_layers, config, dtype, args):
+def export_decoders(decoder_layers, config, dtype, args, model_name):
     """
     Note
     # please be care of the format of kv cache
     # some models use format of [batch, head, seq_len, hidden_size]
     # while some models use format of [batch, seq_len, head, hidden_size]
     """
-    onnx_file_name = os.path.join(args.out_dir, "decoders.onnx")
+    onnx_file_name = os.path.join(args.out_dir, f"{model_name}.onnx")
 
     hidden_size = config.hidden_size
 
@@ -151,16 +152,22 @@ def export_decoders(decoder_layers, config, dtype, args):
         "position_ids": {1: 'N', },
     }
 
+    kv_cache_in_shape = [batch, head_num, lastN, hidden_size1]
+    kv_cache_dyn_axes = {2: "lastSum"}
+    if args.kv_cache_format == 1:
+        kv_cache_in_shape = [batch, lastN, head_num, hidden_size1]
+        kv_cache_dyn_axes = {1: "lastSum"}
+
     for i in range(layer_num):
-        past_key_in = torch.randn([batch, head_num, lastN, hidden_size1], dtype=dtype).to(args.device)
-        past_value_in = torch.randn([batch, head_num, lastN, hidden_size1], dtype=dtype).to(args.device)
+        past_key_in = torch.randn(kv_cache_in_shape, dtype=dtype).to(args.device)
+        past_value_in = torch.randn(kv_cache_in_shape, dtype=dtype).to(args.device)
 
         kv_caches_in.extend([past_key_in, past_value_in])
         in_names.extend([f"past_key_in{i}", f"past_value_in{i}"])
         out_names.extend([f"past_key{i}", f"past_value{i}"])
 
-        dynamic_axes[f"past_key_in{i}"] = {2: "lastN"}
-        dynamic_axes[f"past_value_in{i}"] = {2: "lastN"}
+        dynamic_axes[f"past_key_in{i}"] = kv_cache_dyn_axes
+        dynamic_axes[f"past_value_in{i}"] = kv_cache_dyn_axes
 
     torch.onnx.export(
         decoder_layers_wrapper,
@@ -179,26 +186,44 @@ def export_llama(args):
     dtype = torch.float32
     if args.dtype == "float16":
         dtype = torch.float16
+    elif args.dtype == "bfloat16":
+        dtype = torch.bfloat16
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    model = LlamaForCausalLM.from_pretrained(
-        args.model_path, torch_dtype=dtype, device_map=device,
-    )
+    print(f"begin load model from {args.model_path}")
+    # tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path, torch_dtype=dtype, device_map=device, trust_remote_code=True).eval()
+    print(f"finish load model from {args.model_path}")
     config = model.config
 
-    # generation test
-    # prompt = 'Q: What is the largest animal?\nA:'
-    # input_ids = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
+    # default configure for llama like models
+    lm_head_model = model.lm_head
+    embeding_model = model.model.embed_tokens
+    norm_model = model.model.norm
+    decoder_layers = model.model.layers
 
-    # generation_output = model.generate(
-    #     input_ids=input_ids, max_new_tokens=128
-    # )
-    # print(tokenizer.decode(generation_output[0]))
+    print(f"begin export_lm_head")
+    export_lm_head(lm_head_model, config, dtype, args, "lm_head")
 
-    export_lm_head(model.lm_head, config, dtype, args)
-    export_norm(model.model.norm, config, dtype, args)
-    export_embeding(model.model.embed_tokens, config, args)
-    export_decoders(model.model.layers, config, dtype, args)
+    print(f"begin export_embeding")
+    export_embeding(embeding_model, config, args, "embeding")
+
+    print(f"begin export_norm")
+    export_norm(norm_model, config, dtype, args, "norm")
+
+    print(f"begin export_decoders")
+    decoder_pack_size = args.decoder_pack_size
+    if decoder_pack_size <= 0:
+        # export decoders as one onnx models
+        export_decoders(decoder_layers, config, dtype, args, "decoders")
+    else:
+        # export decoders to multiple onnx models
+        decoder_num = len(decoder_layers)
+        export_model_num = (decoder_num + decoder_pack_size - 1) // decoder_pack_size
+
+        for i in range(export_model_num):
+            layers = decoder_layers[i * decoder_pack_size:(i + 1) * decoder_pack_size]
+            export_decoders(layers, config, dtype, args, f"decoders_{i}")
 
 
 if __name__ == "__main__":
@@ -209,8 +234,15 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--out_dir', required=False, type=str, default="")
     parser.add_argument('--opset', required=False, type=int, default=15)
     parser.add_argument('-d', '--device', required=False, type=str, default="cuda")
+    # supported dtype: ["float32", "float16", "bfloat16"]
     parser.add_argument('-p', '--dtype', required=False, type=str, default="float16")
+    parser.add_argument('--decoder_pack_size', required=False, type=int, default=0)
+    # 0 means [batch, head, seq, hidden], 1 means [batch, seq, head, hidden]
+    parser.add_argument('--kv_cache_format', required=False, type=int, default=0)
 
     args = parser.parse_args()
+
+    if args.dtype not in ["float32", "float16", "bfloat16"]:
+        raise ValueError("dtype is invalid")
 
     export_llama(args)
