@@ -1,7 +1,7 @@
 # export_llama_as_onnx
-export llama as onnx
+Export llama as onnx files without modifying modeling_llama.py
 
-Models to export:
+## Models to export
 
 LlamaForCausalLM.lm_head
 
@@ -13,7 +13,7 @@ LlamaModel.norm
 
 
 
-Usage example:
+## Usage example
 
 ```python
 python export_llama.py -m model_path
