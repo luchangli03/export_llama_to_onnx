@@ -23,7 +23,7 @@ the simplest example is
 python export_llama.py -m model_path
 ```
 
-There are also some other arguments can be used to configure the export.
+Also some other arguments can be used to configure the export.
 
 
 
