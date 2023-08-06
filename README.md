@@ -29,7 +29,7 @@ Also some other arguments can be used to configure the export.
 
 ## Note
 
-Please uninstall FlashAttention before model conversion.
+Please uninstall/disable FlashAttention (and maybe xformers) before model conversion.
 
 For kv_cache, some models use the format of [batch, head, seq, hidden], while some use [batch, seq, head, hidden]. However, the [batch, seq, head, hidden] format is much more friendly for deployment, since the memory of new cache is continuous.
 
