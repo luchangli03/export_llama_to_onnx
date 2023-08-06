@@ -231,16 +231,31 @@ def export_decoders(decoder_layers, config, dtype, args, model_name):
 
 def export_llama(args):
     device = args.device
-    dtype = torch.float32
-    if args.dtype == "float16":
+    dtypes_config = {
+        "fp32": False,
+        "fp16": False,
+        "bf16": False,
+    }
+    if args.dtype == "float32":
+        dtype = torch.float32
+        dtypes_config["fp32"] = True
+    elif args.dtype == "float16":
         dtype = torch.float16
+        dtypes_config["fp16"] = True
     elif args.dtype == "bfloat16":
         dtype = torch.bfloat16
+        dtypes_config["bf16"] = True
 
     print(f"begin load model from {args.model_path}")
     # tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_path, torch_dtype=dtype, device_map=device, trust_remote_code=True).eval()
+
+    if not args.model_type:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True).eval()
+    elif args.model_type == "Qwen":
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_path, device_map=device, **dtypes_config, trust_remote_code=True).eval()
+
     print(f"finish load model from {args.model_path}")
     config = model.config
 
