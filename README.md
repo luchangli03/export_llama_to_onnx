@@ -33,5 +33,5 @@ Please uninstall FlashAttention before model conversion.
 
 For kv_cache, some models use the format of [batch, head, seq, hidden], while some use [batch, seq, head, hidden]. However, the [batch, seq, head, hidden] format is much more friendly for deployment, since the memory of new cache is continuous.
 
-The project and its developers are not responsible for the correctness of the model or any consequences arising from the use of the exported models.
+The project and its developers are not responsible for the correctness of the models, and any consequences arising from the use of the exported models.
 
