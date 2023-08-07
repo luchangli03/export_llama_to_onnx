@@ -175,7 +175,7 @@ def export_decoders(decoder_layers, config, dtype, args, model_name):
 
         dynamic_axes = {
             'hidden_in': {1: 'N', },
-            'attention_mask': {1: 'N', 2: "sumN"},
+            'attention_mask': {2: 'N', 3: "sumN"},
             "position_ids": {1: 'N', },
         }
 
@@ -189,7 +189,7 @@ def export_decoders(decoder_layers, config, dtype, args, model_name):
 
         dynamic_axes = {
             'hidden_in': {1: 'N', },
-            'attention_mask': {1: 'N', 2: "sumN"},
+            'attention_mask': {2: 'N', 3: "sumN"},
         }
 
     kv_caches_in = []
