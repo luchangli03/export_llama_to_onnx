@@ -1,6 +1,9 @@
 # export_llama_as_onnx
 Export llama as onnx files without modifying transformers modeling_llama.py
 
+## support export ChatGlm2 by export_chatglm2.py
+Please use pytorch 2.1 (newest nightly built version).
+
 ## Models to export
 
 For llama, we will export four onnx files by the following models:
