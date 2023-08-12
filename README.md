@@ -1,5 +1,5 @@
-# export_llama_as_onnx
-Export llama as onnx files without modifying transformers modeling_llama.py
+# export llama to onnx
+Export llama to onnx files without modifying transformers modeling_llama.py
 
 ## support export llama_hf, Alibaba Qwen
 
