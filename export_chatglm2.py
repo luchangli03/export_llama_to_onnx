@@ -1,4 +1,5 @@
 import os
+import logging
 import argparse
 import torch
 from torch import nn
@@ -30,12 +31,14 @@ def export_embeding(embed_model, config, args, model_name):
 
 
 class ChatGLMModelWrapper(nn.Module):
-    def __init__(self, chat_glm_model, config):
+    def __init__(self, chat_glm_model, config, args):
         super().__init__()
         self.chat_glm_model = chat_glm_model
         self.config = config
         self.max_seq_len = config.seq_length
         self.layer_num = chat_glm_model.encoder.num_layers
+
+        self.args = args
 
     def forward(
         self, inputs_embeds, attention_mask, position_ids, kv_caches
@@ -63,7 +66,14 @@ class ChatGLMModelWrapper(nn.Module):
         hidden_states = hidden_states[-1:]
         lm_logits = self.chat_glm_model.output_layer(hidden_states)
 
-        return lm_logits, *kv_caches_out
+        topk_outputs = []
+        if self.args.add_topk_warper > 0:
+            logging.warning("add topk to glm model")
+            if self.args.topk < 0:
+                raise ValueError("topk {} is invalid")
+            topk_outputs = torch.topk(lm_logits, k=self.args.topk, dim=-1)
+
+        return lm_logits, *kv_caches_out, *topk_outputs
 
 
 def export_chat_glm_model(chat_glm_model, config, dtype, args, model_name):
@@ -74,7 +84,7 @@ def export_chat_glm_model(chat_glm_model, config, dtype, args, model_name):
     # while some models use format of [batch, seq_len, head, hidden_size]
     """
     onnx_file_name = os.path.join(args.out_dir, f"{model_name}.onnx")
-    glm_model_wrapper = ChatGLMModelWrapper(chat_glm_model, config)
+    glm_model_wrapper = ChatGLMModelWrapper(chat_glm_model, config, args)
 
     hidden_size = config.hidden_size
     layer_num = chat_glm_model.encoder.num_layers
@@ -117,6 +127,9 @@ def export_chat_glm_model(chat_glm_model, config, dtype, args, model_name):
         dynamic_axes[f"past_value_in{i}"] = kv_cache_dyn_axes
 
     input_datas = (hidden_in, attention_mask, position_ids, kv_caches_in)
+
+    if args.add_topk_warper > 0:
+        out_names.extend(["logits_topk_value", "logits_topk_idx"])
 
     torch.onnx.export(
         glm_model_wrapper,
@@ -180,8 +193,9 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--device', required=False, type=str, default="cuda")
     # supported dtype: ["float32", "float16", "bfloat16"]
     parser.add_argument('-p', '--dtype', required=False, type=str, default="float16")
-    # 0: export all decoders into one onnx. >0: export multiple onnx files, and each onnx has decoder_pack_size layers
-    parser.add_argument('--decoder_pack_size', required=False, type=int, default=0)
+
+    parser.add_argument('--add_topk_warper', required=False, type=int, default=0)
+    parser.add_argument('--topk', required=False, type=int, default=4)
 
     args = parser.parse_args()
 
