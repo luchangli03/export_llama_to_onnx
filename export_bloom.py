@@ -91,13 +91,13 @@ def export_transformer(model, config, dtype, args, model_name):
 
     layer_num = config.n_layer
 
-    hidden_in = torch.randn([N, batch, hidden_size], dtype=dtype).to(args.device)
+    hidden_in = torch.randn([batch, N, hidden_size], dtype=dtype).to(args.device)
     attention_mask = torch.ones([1, sumN], dtype=torch.int64).to(args.device)
 
     in_names = ["hidden_in", "attention_mask"]
 
     dynamic_axes = {
-        'hidden_in': {0: 'N', },
+        'hidden_in': {1: 'N', },
         'attention_mask': {1: "sumN"},
     }
 
@@ -109,7 +109,8 @@ def export_transformer(model, config, dtype, args, model_name):
 
     k_cache_in_shape = [n_head, cache_channel, lastN]
     v_cache_in_shape = [n_head, lastN, cache_channel]
-    kv_cache_dyn_axes = {0: "lastSum"}
+    k_cache_dyn_axes = {2: "lastSum"}
+    v_cache_dyn_axes = {1: "lastSum"}
 
     for i in range(layer_num):
         past_key_in = torch.randn(k_cache_in_shape, dtype=dtype).to(args.device)
@@ -119,8 +120,8 @@ def export_transformer(model, config, dtype, args, model_name):
         in_names.extend([f"past_key_in{i}", f"past_value_in{i}"])
         out_names.extend([f"past_key{i}", f"past_value{i}"])
 
-        dynamic_axes[f"past_key_in{i}"] = kv_cache_dyn_axes
-        dynamic_axes[f"past_value_in{i}"] = kv_cache_dyn_axes
+        dynamic_axes[f"past_key_in{i}"] = k_cache_dyn_axes
+        dynamic_axes[f"past_value_in{i}"] = v_cache_dyn_axes
 
     input_datas = (hidden_in, attention_mask, kv_caches_in)
 
