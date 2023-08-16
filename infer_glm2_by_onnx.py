@@ -68,7 +68,6 @@ position_ids = np.arange(sumN).reshape([1, -1]).astype("int64")
 input_ids = input_ids.astype("int64")
 position_ids = position_ids.astype("int64")
 
-embeding_model = OnnxRuntimeModel("build/embeding.onnx")
 glm_model = OnnxRuntimeModel("build/chat_glm_model.onnx")
 
 max_seq = 512
@@ -81,19 +80,11 @@ for i in range(max_seq):
     print("input_ids:", input_ids)
     print("position_ids:", position_ids)
 
-    embeding_input = {
-        "input": input_ids,
-    }
-    embeding = embeding_model(**embeding_input)[0]
-    print(embeding)
-
-    hidden_in = embeding
-
     attention_mask = gen_attention_mask(N, sumN).astype("bool")
     print("attention_mask:", attention_mask)
     attention_mask = attention_mask.reshape([1, 1, N, sumN])
 
-    glm_model_inputs["hidden_in"] = hidden_in
+    glm_model_inputs["input_ids"] = input_ids
     glm_model_inputs["attention_mask"] = attention_mask
     glm_model_inputs["position_ids"] = position_ids
 
