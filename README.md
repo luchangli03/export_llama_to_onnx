@@ -19,17 +19,28 @@ LlamaModel.layers
 
 LlamaModel.norm
 
+Actually it's veary easy to convert all these sub models in a single onnx model, we show this in export chatglm2.py.
 
 
 ## Usage example
 
-the simplest example is
-
+convert llama_hf
 ```python
-python export_llama.py -m model_path
+python export_llama.py -m model_dir --dtype fp16
 ```
 
-Also some other arguments can be used to configure the export.
+convert Qwen:
+```python
+python export_llama.py -m model_dir --dtype fp16 --model_type Qwen
+```
+before converting Qwen, it's better to replace the rearrange ops in modeling_qwen.py to simplify the exported onnx models (please ref https://blog.csdn.net/u013701860/article/details/132123476). 
+
+convert chatglm2:
+```python
+python export_chatglm2.py -m model_dir --dtype fp16 # [--add_topk_warper 1]
+```
+
+Some other arguments can be used to configure the export, such as the opset, output dirs.
 
 
 
