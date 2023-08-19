@@ -5,7 +5,7 @@ Export llama to onnx files without modifying transformers modeling_llama.py
 
 ## support export ChatGlm2 by export_chatglm2.py
 Please use pytorch 2.1 (if not released, use newest nightly built version) for exporting chatglm2.
-You can refer demo infer_glm2_by_onnx.py for infering exported chatglm2 onnx
+You can refer demo infer_glm2_by_onnx.py for inferring exported chatglm2 onnx
 
 ## support export bloom by export_bloom.py
 
@@ -21,7 +21,7 @@ LlamaModel.layers
 
 LlamaModel.norm
 
-Actually it's veary easy to convert all these sub models in a single onnx model, we show this in export chatglm2.py.
+Actually it's very easy to convert all these sub models in a single onnx model, we show this in export chatglm2.py.
 
 
 ## Usage example
