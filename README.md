@@ -29,7 +29,7 @@ Actually it's very easy to convert all these sub models in a single onnx model, 
 convert llama_hf
 ```python
 python export_llama.py -m model_dir --dtype fp16 # convert model to multi onnx files
-# python export_llama_single.py -m model_dir --dtype fp16 # convert model into single onnx file
+# python export_llama_single.py -m model_dir --dtype fp16 # convert model to single onnx file
 ```
 
 convert Qwen:
