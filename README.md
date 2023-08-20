@@ -21,14 +21,15 @@ LlamaModel.layers
 
 LlamaModel.norm
 
-Actually it's very easy to convert all these sub models in a single onnx model, we show this in export chatglm2.py.
+Actually it's very easy to convert all these sub models in a single onnx model, we show this in export chatglm2.py, export_llama_single.py.
 
 
 ## Usage example
 
 convert llama_hf
 ```python
-python export_llama.py -m model_dir --dtype fp16
+python export_llama.py -m model_dir --dtype fp16 # convert model to multi onnx files
+# python export_llama_single.py -m model_dir --dtype fp16 # convert model into single onnx file
 ```
 
 convert Qwen:
