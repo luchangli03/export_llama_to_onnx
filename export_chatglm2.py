@@ -45,7 +45,7 @@ class ChatGLMModelWrapper(nn.Module):
         lm_logits = self.chat_glm_model.output_layer(hidden_states)
  
         topk_outputs = []
-        if self.args.add_topk_warper > 0:
+        if self.args.add_topk_warper:
             logging.warning("add topk to glm model")
             if self.args.topk < 0:
                 raise ValueError("topk {} is invalid")
@@ -106,7 +106,7 @@ def export_chat_glm_model(chat_glm_model, config, dtype, args, model_name):
  
     input_datas = (input_ids, attention_mask, position_ids, kv_caches_in)
  
-    if args.add_topk_warper > 0:
+    if args.add_topk_warper:
         out_names.extend(["logits_topk_value", "logits_topk_idx"])
  
     torch.onnx.export(
@@ -123,7 +123,7 @@ def export_chat_glm_model(chat_glm_model, config, dtype, args, model_name):
  
 def export_chatglm2(args):
     """
-    this method convert embeding, transformer, output_layer into a whole onnx model
+    this method convert embedding, transformer, output_layer into a single onnx model
     if you want to export them independently, please check older git commit
     """
     device = args.device
@@ -135,11 +135,13 @@ def export_chatglm2(args):
         dtype = torch.bfloat16
  
     print(f"begin load model from {args.model_path}")
-    # tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    model = AutoModel.from_pretrained(args.model_path, trust_remote_code=True).half()
+    model = AutoModel.from_pretrained(args.model_path, trust_remote_code=True)
     if args.dtype == "float32":
-        model.float()
-        print("convert model to float")
+        model = model.float()
+        print("convert model to float32")
+    else:
+        model = model.half()
+        print("convert model to float16")
  
     if args.device == "cuda":
         model.cuda()
@@ -163,16 +165,12 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--model_path', required=True, type=str)
     parser.add_argument('-o', '--out_dir', required=False, type=str, default="")
     parser.add_argument('--opset', required=False, type=int, default=15)
-    parser.add_argument('-d', '--device', required=False, type=str, default="cuda")
-    # supported dtype: ["float32", "float16", "bfloat16"]
-    parser.add_argument('-p', '--dtype', required=False, type=str, default="float16")
+    parser.add_argument('-d', '--device', required=False, type=str, choices=["cpu", "cuda"], default="cuda")
+    parser.add_argument('-p', '--dtype', required=False, type=str, choices=["float32", "float16", "bfloat16"], default="float16")
  
-    parser.add_argument('--add_topk_warper', required=False, type=int, default=0)
+    parser.add_argument('--add_topk_warper', action='store_true')
     parser.add_argument('--topk', required=False, type=int, default=4)
  
     args = parser.parse_args()
- 
-    if args.dtype not in ["float32", "float16", "bfloat16"]:
-        raise ValueError("dtype is invalid")
  
     export_chatglm2(args)
