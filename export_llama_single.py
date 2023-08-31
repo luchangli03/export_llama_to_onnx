@@ -74,10 +74,10 @@ def export_llama_to_single_onnx(model, config, dtype, args, model_name):
     attention_mask = torch.randn([batch, 1, N, sumN], dtype=dtype).to(args.device)
     position_ids = torch.ones([batch, N], dtype=torch.int64).to(args.device)
 
-    in_names = ["hidden_in", "attention_mask", "position_ids"]
+    in_names = ["input_ids", "attention_mask", "position_ids"]
 
     dynamic_axes = {
-        'hidden_in': {1: 'N', },
+        'input_ids': {1: 'N', },
         'attention_mask': {2: 'N', 3: "sumN"},
         "position_ids": {1: 'N', },
     }
