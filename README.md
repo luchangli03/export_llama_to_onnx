@@ -1,5 +1,5 @@
 # export llama to onnx
-Export LLM to onnx files without modifying transformers modeling_llama.py
+Export LLM to onnx files without modifying transformers modeling_xx_model.py
 
 ## supported models
 llama (hugging face format), including llama, alpaca, etc.
@@ -15,31 +15,30 @@ bloom
 
 export llama_hf
 ```python
-python export_llama.py -m model_dir --dtype fp16 # convert model to multi onnx files
-# python export_llama_single.py -m model_dir --dtype fp16 # convert model to single onnx file
+# python export_llama.py -m model_dir -o out_dir --dtype fp16 # convert model to multi onnx files
+python export_llama_single.py -m model_dir -o out_dir --dtype fp16 # convert model to single onnx file
 ```
 
 export Qwen:
 ```python
-python export_qwen_naive.py -m model_dir -o out_dir
+python export_qwen_naive.py -m model_dir -o out_dir --dtype fp16
 ```
 before converting Qwen, it's better to replace the rearrange ops in modeling_qwen.py to simplify the exported onnx models (please ref https://blog.csdn.net/u013701860/article/details/132123476). 
 
 export chatglm2:
 ```python
-python export_chatglm2.py -m model_dir --dtype fp16 # [--add_topk_warper 1]
+python export_chatglm2.py -m model_dir --dtype fp16
 ```
 Please use pytorch >= 2.1 (if not released, use newest nightly built version) for exporting chatglm2.
 You can refer demo infer_glm2_by_onnx.py for inferring exported chatglm2 onnx
 
 export bloom:
 ```python
-python export_bloom_naive.py -m model_dir -o out_dir --dtype fp16 # [--add_topk_warper 1]
-# python export_bloom.py -m model_dir -o out_dir --dtype fp16 # [--add_topk_warper 1]
+python export_bloom_naive.py -m model_dir -o out_dir --dtype fp16
+# python export_bloom.py -m model_dir -o out_dir --dtype fp16 # export more efficient and simpler model
 ```
 
-Some other arguments can be used to configure the export, such as the opset, output dirs.
-
+Some other arguments can be used to configure the export, for example --opset can be used to set onnx opset, --add_topk_warper can be used to add topk warper to onnx model.
 
 ## Note
 
