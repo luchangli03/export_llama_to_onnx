@@ -1,10 +1,13 @@
 # export llama to onnx
-Export llama to onnx files without modifying transformers modeling_llama.py
+Export LLM to onnx files without modifying transformers modeling_llama.py
 
 ## supported models
 llama (hugging face format), including llama, alpaca, etc.
+
 Alibaba Qwen
+
 ChatGlm2
+
 bloom
 
 
