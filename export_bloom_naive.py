@@ -162,6 +162,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if not os.path.exists(args.out_dir):
+        os.mkdir(args.out_dir)
     if args.dtype not in ["float32", "float16", "bfloat16"]:
         raise ValueError("dtype is invalid")
 
