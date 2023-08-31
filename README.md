@@ -43,8 +43,13 @@ convert chatglm2:
 python export_chatglm2.py -m model_dir --dtype fp16 # [--add_topk_warper 1]
 ```
 
-Some other arguments can be used to configure the export, such as the opset, output dirs.
+convert bloom:
+```python
+python export_bloom_naive.py -m model_dir -o out_dir --dtype fp16 # [--add_topk_warper 1]
+# python export_bloom.py -m model_dir -o out_dir --dtype fp16 # [--add_topk_warper 1]
+```
 
+Some other arguments can be used to configure the export, such as the opset, output dirs.
 
 
 ## Note
