@@ -34,7 +34,7 @@ python export_llama.py -m model_dir --dtype fp16 # convert model to multi onnx f
 
 convert Qwen:
 ```python
-python export_llama.py -m model_dir --dtype fp16 --model_type Qwen
+python export_qwen_naive.py -m model_dir -o out_dir
 ```
 before converting Qwen, it's better to replace the rearrange ops in modeling_qwen.py to simplify the exported onnx models (please ref https://blog.csdn.net/u013701860/article/details/132123476). 
 
