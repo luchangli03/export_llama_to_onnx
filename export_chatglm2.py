@@ -172,5 +172,6 @@ if __name__ == "__main__":
     parser.add_argument('--topk', required=False, type=int, default=4)
  
     args = parser.parse_args()
- 
+    if not os.path.exists(args.out_dir):
+        os.mkdir(args.out_dir)
     export_chatglm2(args)
