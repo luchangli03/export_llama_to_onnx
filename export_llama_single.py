@@ -83,7 +83,7 @@ def export_llama_to_single_onnx(model, config, dtype, args, model_name):
     }
 
     kv_caches_in = []
-    out_names = ["hidden_out"]
+    out_names = ["lm_logits"]
 
     kv_cache_in_shape = [batch, head_num, lastN, hidden_size1]
     kv_cache_dyn_axes = {2: "lastSum"}
