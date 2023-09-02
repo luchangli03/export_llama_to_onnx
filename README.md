@@ -1,5 +1,5 @@
 # export llama to onnx
-Export LLM to onnx files without modifying transformers modeling_xx_model.py
+Export LLM like llama to onnx files without modifying transformers modeling_xx_model.py
 
 ## supported models
 llama (hugging face format), including llama, alpaca, etc.
@@ -45,6 +45,8 @@ Some other arguments can be used to configure the export, for example --opset ca
 Please uninstall/disable FlashAttention (and maybe xformers) before model conversion.
 
 For kv_cache, some models use the format of [batch, head, seq, hidden], while some use [batch, seq, head, hidden]. However, the [batch, seq, head, hidden] (for batch=1) or [seq, batch, head, hidden] (for both batch=1 or batch!=1) format is much more friendly for deployment, since the memory of new cache is continuous added to old cache.
+
+To simplify the large onnx model exported by LLM, you can try https://github.com/luchangli03/onnxsim_large_model
 
 The project (all versions) and its developers are not responsible for the correctness of the exported models, and any consequences arising from the use of the project and exported models.
 
