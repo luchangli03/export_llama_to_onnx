@@ -4,12 +4,13 @@ Export LLM like llama to onnx files without modifying transformers modeling_xx_m
 ## supported models
 llama (hugging face format), including llama, alpaca, etc.
 
-Alibaba Qwen
+Baichuan (using the llama exporter)
 
-ChatGlm2
+Alibaba Qwen 1.5/2
+
+ChatGlm2/ChatGlm3
 
 bloom
-
 
 ## Usage example
 
