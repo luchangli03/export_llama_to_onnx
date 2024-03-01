@@ -10,6 +10,8 @@ Alibaba Qwen 1.5/2
 
 ChatGlm2/ChatGlm3
 
+Gemma
+
 bloom
 
 ## Usage example
