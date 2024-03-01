@@ -164,6 +164,12 @@ modication 2: in Qwen2Model.forward
                 sliding_window=self.config.sliding_window,
             )
         '''
+modication 3: in Qwen2RotaryEmbedding.forward
+        return (self.cos_cached.to(dtype=x.dtype), self.sin_cached.to(dtype=x.dtype))
+        # return (
+        #     self.cos_cached[:seq_len].to(dtype=x.dtype),
+        #     self.sin_cached[:seq_len].to(dtype=x.dtype),
+        # )
 """
  
 if __name__ == "__main__":
