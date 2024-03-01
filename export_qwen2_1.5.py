@@ -58,7 +58,7 @@ def export_qwen_to_single_onnx(model, config, dtype, args, model_name):
  
     input_ids = torch.ones([batch, N], dtype=torch.int64).to(args.device)
     # attention_mask = torch.ones([batch, sumN], dtype=torch.int64).to(args.device)
-    attention_mask = torch.ones([1, 1, N, sumN], dtype=dtype).to(args.device)
+    attention_mask = torch.zeros([1, 1, N, sumN], dtype=dtype).to(args.device)
     position_ids = torch.ones([batch, N], dtype=torch.int64).to(args.device)
  
     in_names = ["input_ids", "attention_mask", "position_ids"]
