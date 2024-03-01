@@ -20,47 +20,32 @@ class QwenForCausalLMWrapper(nn.Module):
         position_ids,
         past_key_values,
     ):
-        transformer_outputs = self.model.transformer(
-            input_ids,
-            past_key_values=past_key_values,
+        outputs = self.model(
+            input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=None,
             position_ids=position_ids,
-            head_mask=None,
-            inputs_embeds=None,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
+            past_key_values=past_key_values,
             use_cache=True,
-            output_attentions=False,
-            output_hidden_states=False,
-            return_dict=None,
         )
+        logits = outputs.logits
  
         kv_caches_out = []
-        for past_kv in transformer_outputs.past_key_values:
+        for past_kv in outputs.past_key_values:
             kv_caches_out.extend(past_kv)
- 
-        hidden_states = transformer_outputs[0]
- 
-        hidden_states = hidden_states[:, -1, :]
-        lm_logits = self.model.lm_head(hidden_states)
  
         topk_outputs = []
         if self.args.add_topk_warper > 0:
             logging.warning("add topk to glm model")
             if self.args.topk < 0:
                 raise ValueError("topk {} is invalid")
-            topk_outputs = torch.topk(lm_logits, k=self.args.topk, dim=-1)
- 
-        return lm_logits, *kv_caches_out, *topk_outputs
+            topk_outputs = torch.topk(logits, k=self.args.topk, dim=-1)
+        return logits, *kv_caches_out, *topk_outputs
  
  
 def export_qwen_to_single_onnx(model, config, dtype, args, model_name):
     qwen_model_wrapper = QwenForCausalLMWrapper(model, config, args)
- 
     onnx_file_name = os.path.join(args.out_dir, f"{model_name}.onnx")
- 
-    layer_num = config.num_hidden_layers
+    layer_num = len(model.model.layers)
  
     hidden_size = config.hidden_size
     head_num = config.num_attention_heads
@@ -72,22 +57,23 @@ def export_qwen_to_single_onnx(model, config, dtype, args, model_name):
     lastSum = sumN - N
  
     input_ids = torch.ones([batch, N], dtype=torch.int64).to(args.device)
-    attention_mask = torch.ones([batch, sumN], dtype=torch.int64).to(args.device)
+    # attention_mask = torch.ones([batch, sumN], dtype=torch.int64).to(args.device)
+    attention_mask = torch.ones([1, 1, N, sumN], dtype=dtype).to(args.device)
     position_ids = torch.ones([batch, N], dtype=torch.int64).to(args.device)
  
     in_names = ["input_ids", "attention_mask", "position_ids"]
  
     dynamic_axes = {
-        'input_ids': {0: 'batch', 1: 'N', },
-        'attention_mask': {0: 'batch', 1: "sumN"},
-        "position_ids": {0: 'batch', 1: 'N', },
+        'input_ids': {1: 'N', },
+        'attention_mask': {2: "N", 3: "sumN"},
+        "position_ids": {1: 'N', },
     }
  
     kv_caches_in = []
     out_names = ["lm_logits"]
  
-    kv_cache_in_shape = [batch, lastSum, head_num, head_dim]
-    kv_cache_dyn_axes = {0: 'batch', 1: "lastSum"}
+    kv_cache_in_shape = [batch, head_num, lastSum, head_dim]
+    kv_cache_dyn_axes = {2: "sumN-N"}
  
     past_key_values = []
  
@@ -120,28 +106,18 @@ def export_qwen_to_single_onnx(model, config, dtype, args, model_name):
  
 def export_qwen(args):
     device = args.device
- 
-    dtype_cfg = {
-        "fp32": False,
-        "fp16": False,
-        "bf16": False,
+    dtype_map = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
     }
- 
-    if args.dtype == "float32":
-        dtype_cfg["fp32"] = True
-        dtype = torch.float32
-    elif args.dtype == "float16":
-        dtype_cfg["fp16"] = True
-        dtype = torch.float16
-    elif args.dtype == "bfloat16":
-        dtype_cfg["bf16"] = True
-        dtype = torch.bfloat16
+    dtype = dtype_map[args.dtype]
  
     print(f"begin load model from {args.model_path}")
-    # tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
- 
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_path, device_map=device, trust_remote_code=True, **dtype_cfg).eval()
+        args.model_path, device_map=device, trust_remote_code=True, torch_dtype=dtype).eval()
+ 
+    # model.model.layers = model.model.layers[:1]  # debug
  
     print(f"finish load model from {args.model_path}")
     config = model.config
@@ -150,6 +126,45 @@ def export_qwen(args):
     print(f"begin export qwen")
     export_qwen_to_single_onnx(model, config, dtype, args, "qwen_onnx")
  
+ 
+model_modication_note = """
+modication 1: in Qwen2ForCausalLM.forward
+        hidden_states = outputs[0]
+        hidden_states = hidden_states[:,-1:,:] # <<--
+        logits = self.lm_head(hidden_states)
+modication 2: in Qwen2Model.forward
+        '''
+        if attention_mask is not None and self._attn_implementation == "flash_attention_2" and use_cache:
+            is_padding_right = attention_mask[:, -1].sum().item() != batch_size
+            if is_padding_right:
+                raise ValueError(
+                    "You are attempting to perform batched generation with padding_side='right'"
+                    " this may lead to unexpected behaviour for Flash Attention version of Qwen2. Make sure to "
+                    " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
+                )
+        if self._attn_implementation == "flash_attention_2":
+            # 2d mask is passed through the layers
+            attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None
+        elif self._attn_implementation == "sdpa" and not output_attentions:
+            # output_attentions=True can not be supported when using SDPA, and we fall back on
+            # the manual implementation that requires a 4D causal mask in all cases.
+            attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
+                attention_mask,
+                (batch_size, seq_length),
+                inputs_embeds,
+                past_key_values_length,
+            )
+        else:
+            # 4d mask is passed through the layers
+            attention_mask = _prepare_4d_causal_attention_mask(
+                attention_mask,
+                (batch_size, seq_length),
+                inputs_embeds,
+                past_key_values_length,
+                sliding_window=self.config.sliding_window,
+            )
+        '''
+"""
  
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -161,23 +176,13 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--device', required=False, type=str, choices=["cpu", "cuda"], default="cuda")
     parser.add_argument('-p', '--dtype', required=False, type=str,
                         choices=["float32", "float16", "bfloat16"], default="float16")
- 
     parser.add_argument('--add_topk_warper', action='store_true')
     parser.add_argument('--topk', required=False, type=int, default=4)
- 
     args = parser.parse_args()
  
     if not os.path.exists(args.out_dir):
         os.mkdir(args.out_dir)
  
-    export_qwen(args)
+    logging.warning(f"*** Note: please apply modications to model before conversion: {model_modication_note}")
  
-    logging.warning(
-        """
-        you can optimize exported onnx by follwing methods:
-        1. replace einops rearrange in modeling_qwen.py
-        2. replace the attention_mask by expanded attention_mask to avoid expanding mask in onnx
-        3. optimize RotaryEmbedding to compute position embeding of max seq len,
-        and using tensor gather to get embeding of each iteration, but not recompute it, just like llama and chatglm2
-        """
-    )
+    export_qwen(args)
