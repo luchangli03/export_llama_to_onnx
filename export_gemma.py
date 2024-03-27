@@ -3,7 +3,8 @@ import argparse
 import torch
 from torch import nn
 from transformers import AutoModelForCausalLM, AutoTokenizer
- 
+import logging
+
  
 class LLMForCausalLMWrapper(nn.Module):
     def __init__(self, model, config, args):
@@ -60,7 +61,7 @@ def export_llm_to_single_onnx(model, config, dtype, args, model_name):
     layer_num = len(model.model.layers)
  
     hidden_size = config.hidden_size
-    head_num = config.num_attention_heads
+    kv_head_num = config.num_key_value_heads
     head_dim = config.head_dim
  
     batch = 1
@@ -89,7 +90,7 @@ def export_llm_to_single_onnx(model, config, dtype, args, model_name):
     kv_caches_in = []
     out_names = ["lm_logits"]
  
-    kv_cache_in_shape = [1, 1, lastSum, head_dim]
+    kv_cache_in_shape = [1, kv_head_num, lastSum, head_dim]
     kv_cache_dyn_axes = {2: "sumN-N"}
  
     if args.dyn_batch:
